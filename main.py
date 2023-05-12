@@ -6,6 +6,10 @@ from bs4.element import NavigableString
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 
+
+# TODO: Make an ability state saving of crawling after program finish
+# TODO: Logging
+
 class Crawler:
 
     def __init__(self):
@@ -39,8 +43,8 @@ class Crawler:
                 field_content.append(info)
         return field_content
 
+    # Model
     def get_contacts(self, search_results_url, full_contacts_info_page_urls):
-        # logging.debug('Current url:' + str(search_results_url))
         for full_contacts_info_page_url in full_contacts_info_page_urls:
             full_contact_info, full_contact_info_page_href = self.get_contact_info_and_href(full_contacts_info_page_url)
             # Get shopname
@@ -76,15 +80,6 @@ class Crawler:
         full_contact_info_page_href = self.get_bs4(full_contacts_info_page_url.a.attrs['href'])
         full_contact_info = full_contact_info_page_href.find('div', {'class', 'contact-wrap'})
         return full_contact_info, full_contact_info_page_href
-
-    def save_to_dictionary(self, parsed_address, parsed_email, parsed_insta, parsed_nation, parsed_owner,
-                           parsed_shopname, parsed_website, telephones):
-        row = {'SHOP NAME': parsed_shopname, 'OWNER': parsed_owner, 'ADDRESS': parsed_address,
-               'NATION': parsed_nation,
-               'TELEPHONES': telephones, 'E-MAIL': parsed_email, 'WEBSITE': parsed_website,
-               'INSTAGRAM': parsed_insta, }
-        self.table.append(row)
-        return row
 
     def get_instagram(self, full_contact_info):
         insta_tag = full_contact_info.find('dt', {'class': {'social-icon', 'instagram'}}).find_next('dd').a
@@ -128,6 +123,15 @@ class Crawler:
         parsed_shopname = ''.join(shopname)
         return parsed_shopname
 
+    def save_to_dictionary(self, parsed_address, parsed_email, parsed_insta, parsed_nation, parsed_owner,
+                           parsed_shopname, parsed_website, telephones):
+        row = {'SHOP NAME': parsed_shopname, 'OWNER': parsed_owner, 'ADDRESS': parsed_address,
+               'NATION': parsed_nation,
+               'TELEPHONES': telephones, 'E-MAIL': parsed_email, 'WEBSITE': parsed_website,
+               'INSTAGRAM': parsed_insta, }
+        self.table.append(row)
+        return row
+
     @staticmethod
     def debug(row, search_results_url):
         logging.debug('Current url:' + str(search_results_url))
@@ -137,6 +141,7 @@ class Crawler:
             logging.debug(key + ': ' + str(value))
         logging.debug('-' * 70)
 
+    # View
     def record_to_csv_file(self, filename):
         csv_columns = []
         for column in self.table[0].keys():
@@ -151,6 +156,7 @@ class Crawler:
         except IOError:
             print('I/O error')
 
+    # Controller
     def start_parse(self, url):
         self.init_browser()
         current_page_url = url
