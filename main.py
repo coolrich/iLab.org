@@ -6,9 +6,6 @@ from bs4.element import NavigableString
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 
-
-# TODO: Make an ability state saving of crawling after program finish
-# TODO: Logging
 class Crawler:
 
     def __init__(self):
