@@ -1,5 +1,6 @@
 import csv
 import logging
+import pickle
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString
@@ -7,11 +8,13 @@ from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 
 
-# TODO: Make an ability state saving of crawling after program finish
+# TODO: Make an ability state saving of crawling after program finish using the Pickle library.
 
 class Crawler:
 
     def __init__(self):
+        # Dictionary for state serialization
+        self.state_container = {}
         self.table = None
         self.browser = None
         '''filename='web_scraping_log.log','''
@@ -44,6 +47,7 @@ class Crawler:
 
     # Model
     def get_contacts(self, search_results_url, full_contacts_info_page_urls):
+
         for full_contacts_info_page_url in full_contacts_info_page_urls:
             full_contact_info, full_contact_info_page_href = self.get_contact_info_and_href(full_contacts_info_page_url)
             # Get shopname
@@ -158,7 +162,11 @@ class Crawler:
     # Controller
     def start_parse(self, url):
         self.init_browser()
-        current_page_url = url
+        try:
+            with open('data.pkl', 'rb') as f:
+                current_page_url = pickle.load(f)
+        except FileNotFoundError as fnf_error:
+            current_page_url = url
         self.table = []
         try:
             while current_page_url != '':
