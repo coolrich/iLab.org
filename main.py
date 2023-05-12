@@ -15,7 +15,7 @@ class Crawler:
     def __init__(self):
         # Dictionary for state serialization
         self.state_container = {}
-        self.table = None
+        self.table = []
         self.browser = None
         '''filename='web_scraping_log.log','''
         logging.basicConfig(encoding='utf-8', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG)
@@ -47,9 +47,10 @@ class Crawler:
 
     # Model
     def get_contacts(self, search_results_url, full_contacts_info_page_urls):
-
+        self.state_container['last_search_results_url'] = search_results_url
         for full_contacts_info_page_url in full_contacts_info_page_urls:
             full_contact_info, full_contact_info_page_href = self.get_contact_info_and_href(full_contacts_info_page_url)
+            self.state_container['last_full_contact_info_page_href'] = full_contact_info_page_href
             # Get shopname
             parsed_shopname = self.get_shopname(full_contact_info_page_href)
             # Get owner
@@ -163,24 +164,41 @@ class Crawler:
     def start_parse(self, url):
         self.init_browser()
         try:
-            with open('data.pkl', 'rb') as f:
-                current_page_url = pickle.load(f)
-        except FileNotFoundError as fnf_error:
-            current_page_url = url
-        self.table = []
-        try:
-            while current_page_url != '':
-                bs = self.get_bs4(current_page_url)
-                full_contacts_info_page_urls = bs.find_all('div', {'class', 'more'})
-                self.get_contacts(current_page_url, full_contacts_info_page_urls)
-                current_page_url = self.get_next_page(current_page_url)
+            try:
+                with open('data.pkl', 'rb') as f:
+                    data = pickle.load(f)
+                    current_page_url = data['last_search_results_url']
+                    last_contact_info_page_url = data['last_full_contact_info_page_href']
+                    self.controller(current_page_url, last_contact_info_page_url)
+            except FileNotFoundError as fnf_error:
+                self.controller(url)
         except KeyboardInterrupt:
             print("Program is finishing...")
+        self.finalization()
+
+    def finalization(self):
         self.browser.quit()
         filename = 'iLab_table.xlsx'
         self.record_to_csv_file('iLab_table.csv')
         print(f"File was written to file {filename}")
         print('Program was closed.')
+
+    def controller(self, current_page_url, last_contact_info_page_url=None):
+        while current_page_url != '':
+            bs = self.get_bs4(current_page_url)
+            if last_contact_info_page_url is None:
+                full_contacts_info_page_urls = bs.find_all('div', {'class', 'more'})
+                self.get_contacts(current_page_url, full_contacts_info_page_urls)
+                current_page_url = self.get_next_page(current_page_url)
+            else:
+                full_contacts_info_page_urls = \
+                    bs.find('div', {'href', last_contact_info_page_url}).find_all_next('div',
+                                                                                       {
+                                                                                           'class',
+                                                                                           'more'})
+                self.get_contacts(current_page_url, full_contacts_info_page_urls)
+                current_page_url = self.get_next_page(current_page_url)
+                self.controller(full_contacts_info_page_urls)
 
 
 crawler = Crawler()
