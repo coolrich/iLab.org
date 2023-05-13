@@ -180,6 +180,8 @@ class Crawler:
         self.browser.quit()
         filename = 'iLab_table.xlsx'
         self.record_to_csv_file('iLab_table.csv')
+        with open('data.pkl', 'wb') as data_object:
+            pickle.dump(self.state_container, data_object)
         print(f"File was written to file {filename}")
         print('Program was closed.')
 
@@ -197,8 +199,9 @@ class Crawler:
                                                                                            'class',
                                                                                            'more'})
                 self.get_contacts(current_page_url, full_contacts_info_page_urls)
-                current_page_url = self.get_next_page(current_page_url)
-                self.controller(full_contacts_info_page_urls)
+                next_page_url = self.get_next_page(current_page_url)
+                self.controller(current_page_url=next_page_url)
+                break
 
 
 crawler = Crawler()
