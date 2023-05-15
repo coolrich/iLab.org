@@ -7,6 +7,9 @@ from bs4.element import NavigableString
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 
+
+# TODO: Pay attention to file parsing. Some fields may differ from each other.
+
 class Crawler:
 
     def __init__(self):
@@ -39,8 +42,7 @@ class Crawler:
         field_content = []
         for info in info_field.children:
             if type(info) == NavigableString:
-                info = info.strip().replace('\n', '').replace('\t', '').replace('\xa0', '')#.replace('\xe9', ''). \
-                    #replace('\xe6', '')
+                info = info.strip().replace('\n', '').replace('\t', '').replace('\xa0', '')
                 field_content.append(info)
         return field_content
 
