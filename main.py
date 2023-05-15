@@ -177,7 +177,7 @@ class Crawler:
             try:
                 current_page_url, last_contact_info_page_url = self.get_data()
                 self.mode = 'a'
-                self.controller(current_page_url, last_contact_info_page_url)
+                self.continue_parse_from(current_page_url, last_contact_info_page_url)
             except FileNotFoundError as fnf_error:
                 self.mode = 'w'
                 self.controller(url)
@@ -200,20 +200,20 @@ class Crawler:
         print(f"File was written to file {filename}")
         print('Program was closed.')
 
-    def controller(self, current_page_url, last_contact_info_page_url=None):
+    def continue_parse_from(self, current_page_url, last_contact_info_page_url):
+        bs = self.get_bs4(current_page_url)
+        contacts_info_page_url_tag = bs.select(f'div.more a[href="{last_contact_info_page_url}"]')[0]
+        full_contacts_info_page_urls = contacts_info_page_url_tag.find_all_next('div', {'class', 'more'})
+        self.get_contacts(current_page_url, full_contacts_info_page_urls)
+        next_page_url = self.get_next_page(current_page_url)
+        self.controller(current_page_url=next_page_url)
+
+    def controller(self, current_page_url):
         while current_page_url != '':
             bs = self.get_bs4(current_page_url)
-            if last_contact_info_page_url is None:
-                full_contacts_info_page_urls = bs.find_all('div', {'class', 'more'})
-                self.get_contacts(current_page_url, full_contacts_info_page_urls)
-                current_page_url = self.get_next_page(current_page_url)
-            else:
-                contacts_info_page_url_tag = bs.select(f'div.more a[href="{last_contact_info_page_url}"]')[0]
-                full_contacts_info_page_urls = contacts_info_page_url_tag.find_all_next('div', {'class', 'more'})
-                self.get_contacts(current_page_url, full_contacts_info_page_urls)
-                next_page_url = self.get_next_page(current_page_url)
-                self.controller(current_page_url=next_page_url)
-                break
+            full_contacts_info_page_urls = bs.find_all('div', {'class', 'more'})
+            self.get_contacts(current_page_url, full_contacts_info_page_urls)
+            current_page_url = self.get_next_page(current_page_url)
 
 
 crawler = Crawler()
