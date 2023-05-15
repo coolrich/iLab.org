@@ -156,9 +156,10 @@ class Crawler:
             csv_columns.append(column)
         csv_file = filename
         try:
-            with open(csv_file, self.mode, newline='') as csv_file_object:
-                writer = csv.DictWriter(csv_file_object, dialect='excel', fieldnames=csv_columns, delimiter=';')
-                writer.writeheader()
+            with open(csv_file, self.mode, newline='', encoding='utf-16') as csv_file_object:
+                writer = csv.DictWriter(csv_file_object, dialect='excel', fieldnames=csv_columns, delimiter='\t')
+                if self.mode == 'w':
+                    writer.writeheader()
                 for data in self.table:
                     writer.writerow(data)
         except IOError:
@@ -191,15 +192,6 @@ class Crawler:
         last_contact_info_page_url = data['last_full_contact_info_page_href']
         return current_page_url, last_contact_info_page_url
 
-    def finalization(self):
-        self.browser.quit()
-        filename = 'iLab_table.xlsx'
-        self.record_to_csv_file('iLab_table.csv')
-        with open('data.pkl', 'wb') as data_object:
-            pickle.dump(self.state_container, data_object)
-        print(f"File was written to file {filename}")
-        print('Program was closed.')
-
     def continue_parse_from(self, current_page_url, last_contact_info_page_url):
         bs = self.get_bs4(current_page_url)
         contacts_info_page_url_tag = bs.select(f'div.more a[href="{last_contact_info_page_url}"]')[0]
@@ -214,6 +206,15 @@ class Crawler:
             full_contacts_info_page_urls = bs.find_all('div', {'class', 'more'})
             self.get_contacts(current_page_url, full_contacts_info_page_urls)
             current_page_url = self.get_next_page(current_page_url)
+
+    def finalization(self):
+        self.browser.quit()
+        filename = 'iLab_table.xlsx'
+        self.record_to_csv_file('iLab_table.csv')
+        with open('data.pkl', 'wb') as data_object:
+            pickle.dump(self.state_container, data_object)
+        print(f"File was written to file {filename}")
+        print('Program was closed.')
 
 
 crawler = Crawler()
