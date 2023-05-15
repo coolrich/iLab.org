@@ -42,7 +42,7 @@ class Crawler:
         field_content = []
         for info in info_field.children:
             if type(info) == NavigableString:
-                info = info.strip().replace('\n', '').replace('\t', '').replace('\xa0', '').replace('\xe9', '').\
+                info = info.strip().replace('\n', '').replace('\t', '').replace('\xa0', '').replace('\xe9', ''). \
                     replace('\xe6', '')
                 field_content.append(info)
         return field_content
@@ -51,7 +51,8 @@ class Crawler:
     def get_contacts(self, search_results_url, full_contacts_info_page_urls):
         self.state_container['last_search_results_url'] = search_results_url
         for full_contacts_info_page_url in full_contacts_info_page_urls:
-            full_contact_info, bs_full_contact_info_page, full_contact_info_page_href = self.get_contact_info_and_href(full_contacts_info_page_url)
+            full_contact_info, bs_full_contact_info_page, full_contact_info_page_href = self.get_contact_info_and_href(
+                full_contacts_info_page_url)
             self.state_container['last_full_contact_info_page_href'] = str(full_contact_info_page_href)
             # Get shopname
             parsed_shopname = self.get_shopname(bs_full_contact_info_page)
@@ -163,26 +164,32 @@ class Crawler:
         except IOError:
             print('I/O error')
 
+    @staticmethod
+    def open_data():
+        with open('data.pkl', 'rb') as f:
+            # try:
+            data = pickle.load(f)
+        return data
+
     def start_parse(self, url):
         self.init_browser()
         try:
             try:
-                with open('data.pkl', 'rb') as f:
-                    try:
-                        data = pickle.load(f)
-                        current_page_url = data['last_search_results_url']
-                        last_contact_info_page_url = data['last_full_contact_info_page_href']
-                        self.mode = 'a'
-                        self.controller(current_page_url, last_contact_info_page_url)
-                    except EOFError as eoferr:
-                        print(eoferr)
-                        self.mode = 'w'
-                        self.controller(url)
+                current_page_url, last_contact_info_page_url = self.get_data()
+                self.mode = 'a'
+                self.controller(current_page_url, last_contact_info_page_url)
             except FileNotFoundError as fnf_error:
+                self.mode = 'w'
                 self.controller(url)
         except KeyboardInterrupt:
             print("Program is finishing...")
         self.finalization()
+
+    def get_data(self):
+        data = self.open_data()
+        current_page_url = data['last_search_results_url']
+        last_contact_info_page_url = data['last_full_contact_info_page_href']
+        return current_page_url, last_contact_info_page_url
 
     def finalization(self):
         self.browser.quit()
