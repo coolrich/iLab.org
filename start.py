@@ -1,5 +1,6 @@
 import csv
 import logging
+import pickle
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString
@@ -7,12 +8,15 @@ from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 
 
-# TODO: Make an ability state saving of crawling after program finish
+# TODO: Pay attention to file parsing. Some fields may differ from each other.
 
 class Crawler:
 
     def __init__(self):
-        self.table = None
+        # Dictionary for state serialization
+        self.mode = 'w'
+        self.state_container = {}
+        self.table = []
         self.browser = None
         '''filename='web_scraping_log.log','''
         logging.basicConfig(encoding='utf-8', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG)
@@ -38,16 +42,19 @@ class Crawler:
         field_content = []
         for info in info_field.children:
             if type(info) == NavigableString:
-                info = info.strip().replace('\n', '').replace('\t', '').replace('\xa0', '').replace('\xe9', '')
+                info = info.strip().replace('\n', '').replace('\t', '').replace('\xa0', '')
                 field_content.append(info)
         return field_content
 
     # Model
     def get_contacts(self, search_results_url, full_contacts_info_page_urls):
+        self.state_container['last_search_results_url'] = search_results_url
         for full_contacts_info_page_url in full_contacts_info_page_urls:
-            full_contact_info, full_contact_info_page_href = self.get_contact_info_and_href(full_contacts_info_page_url)
+            full_contact_info, bs_full_contact_info_page, full_contact_info_page_href = self.get_contact_info_and_href(
+                full_contacts_info_page_url)
+            self.state_container['last_full_contact_info_page_href'] = str(full_contact_info_page_href)
             # Get shopname
-            parsed_shopname = self.get_shopname(full_contact_info_page_href)
+            parsed_shopname = self.get_shopname(bs_full_contact_info_page)
             # Get owner
             parsed_owner = self.get_owner(full_contact_info)
             # Get address
@@ -76,9 +83,10 @@ class Crawler:
             self.debug(row, search_results_url)
 
     def get_contact_info_and_href(self, full_contacts_info_page_url):
-        full_contact_info_page_href = self.get_bs4(full_contacts_info_page_url.a.attrs['href'])
-        full_contact_info = full_contact_info_page_href.find('div', {'class', 'contact-wrap'})
-        return full_contact_info, full_contact_info_page_href
+        full_contact_info_page_href = full_contacts_info_page_url.a.attrs['href']
+        full_contact_info_page_bs = self.get_bs4(full_contact_info_page_href)
+        full_contact_info = full_contact_info_page_bs.find('div', {'class', 'contact-wrap'})
+        return full_contact_info, full_contact_info_page_bs, full_contact_info_page_href
 
     def get_instagram(self, full_contact_info):
         insta_tag = full_contact_info.find('dt', {'class': {'social-icon', 'instagram'}}).find_next('dd').a
@@ -147,30 +155,63 @@ class Crawler:
             csv_columns.append(column)
         csv_file = filename
         try:
-            with open(csv_file, 'w', newline='') as csv_file_object:
-                writer = csv.DictWriter(csv_file_object, dialect='excel', fieldnames=csv_columns, delimiter=';')
-                writer.writeheader()
+            with open(csv_file, self.mode, newline='', encoding='utf-16') as csv_file_object:
+                writer = csv.DictWriter(csv_file_object, dialect='excel', fieldnames=csv_columns, delimiter='\t')
+                if self.mode == 'w':
+                    writer.writeheader()
                 for data in self.table:
                     writer.writerow(data)
         except IOError:
             print('I/O error')
 
-    # Controller
+    @staticmethod
+    def open_data():
+        with open('data.pkl', 'rb') as f:
+            # try:
+            data = pickle.load(f)
+        return data
+
     def start_parse(self, url):
         self.init_browser()
-        current_page_url = url
-        self.table = []
         try:
-            while current_page_url != '':
-                bs = self.get_bs4(current_page_url)
-                full_contacts_info_page_urls = bs.find_all('div', {'class', 'more'})
-                self.get_contacts(current_page_url, full_contacts_info_page_urls)
-                current_page_url = self.get_next_page(current_page_url)
+            try:
+                current_page_url, last_contact_info_page_url = self.get_data()
+                self.mode = 'a'
+                self.continue_parse_from(current_page_url, last_contact_info_page_url)
+            except FileNotFoundError as fnf_error:
+                self.mode = 'w'
+                self.controller(url)
         except KeyboardInterrupt:
             print("Program is finishing...")
+        self.finalization()
+
+    def get_data(self):
+        data = self.open_data()
+        current_page_url = data['last_search_results_url']
+        last_contact_info_page_url = data['last_full_contact_info_page_href']
+        return current_page_url, last_contact_info_page_url
+
+    def continue_parse_from(self, current_page_url, last_contact_info_page_url):
+        bs = self.get_bs4(current_page_url)
+        contacts_info_page_url_tag = bs.select(f'div.more a[href="{last_contact_info_page_url}"]')[0]
+        full_contacts_info_page_urls = contacts_info_page_url_tag.find_all_next('div', {'class', 'more'})
+        self.get_contacts(current_page_url, full_contacts_info_page_urls)
+        next_page_url = self.get_next_page(current_page_url)
+        self.controller(current_page_url=next_page_url)
+
+    def controller(self, current_page_url):
+        while current_page_url != '':
+            bs = self.get_bs4(current_page_url)
+            full_contacts_info_page_urls = bs.find_all('div', {'class', 'more'})
+            self.get_contacts(current_page_url, full_contacts_info_page_urls)
+            current_page_url = self.get_next_page(current_page_url)
+
+    def finalization(self):
         self.browser.quit()
         filename = 'iLab_table.xlsx'
         self.record_to_csv_file('iLab_table.csv')
+        with open('data.pkl', 'wb') as data_object:
+            pickle.dump(self.state_container, data_object)
         print(f"File was written to file {filename}")
         print('Program was closed.')
 
